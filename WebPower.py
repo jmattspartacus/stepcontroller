@@ -14,7 +14,7 @@ class WebPower:
         return True
 
     def PowerOff(self):
-        retval=subprocess.check_output(["./lnrelay-eth.sh",str(self.index),"ON"]).decode()
+        retval=subprocess.check_output(["./lnrelay-eth.sh",str(self.index),"OFF"]).decode()
         if (int(retval) != 0):
             print("Warning! Error in ./lnrelay-eth.sh")
             return False
@@ -33,3 +33,7 @@ class WebPower:
         else:
             print("Warning! ./lnrelay-check.sh gave unexpected output")
             return False
+
+    def PrintStatus(self):
+        print(f"Webpower switch is {'enabled' if self.CheckStatus() else 'disabled'}!")
+        

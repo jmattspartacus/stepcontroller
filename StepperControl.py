@@ -36,12 +36,6 @@ class StepperControl:
         else:
             return False
 
-    def reinit(self):
-        try:
-            self.motor_setup()
-        except Exception as e:
-            raise e
-
     # Initialization parameters. Note the serial port and baud rate of your project
     # may vary. Our default baud rate is 9600
     def motor_init(self):
@@ -101,14 +95,19 @@ class StepperControl:
             self.send('SP0') # Sets the starting position at 0
 
     def set_steps_per_rotation(self, steps: int) -> None:
-        if type(steps) is int and steps >= 200:
-            sub = self.get_closest_value_in_steps_range(steps)
-            self.send('MR{}'.format(sub[0]))
-            self.stepsPerRot = sub[1] 
-            print("Set resolution to {} steps per rev, gear ratio {}, total steps per rev {}".format(self.stepsPerRot, self.gear_ratio, self.stepsPerRot * self.gear_ratio))
-        else:
+        if type(steps) is not int:
             print(type(steps), steps)
             print("Steps must be an int!")
+            return
+
+        if steps < 200:
+            print("Steps must be greater than 200")
+            return
+
+        sub = self.get_closest_value_in_steps_range(steps)
+        self.send('MR{}'.format(sub[0]))
+        self.stepsPerRot = sub[1] 
+        print("Set resolution to {} steps per rev, gear ratio {}, total steps per rev {}".format(self.stepsPerRot, self.gear_ratio, self.stepsPerRot * self.gear_ratio))
 
     def get_closest_value_in_steps_range(self, val: int) -> int:
         table=[
@@ -129,8 +128,13 @@ class StepperControl:
             print("Move would put it out of range!")
             return
 
+        if (not self.validate_position() or not self.is_motor_on()):
+            print("Move not executed!")
+            return
+
         t_steps = self.angle_to_steps(deg)
         self.targetedAngle  += self.steps_to_angle(t_steps)
+        self.targetedPosition += t_steps
     
         print("Diff in move {:.5f} deg".format(self.get_diff_in_requested_position(t_steps, deg)))
         # we want the timing predictable
@@ -154,20 +158,29 @@ class StepperControl:
                 time.sleep(esttime)
                 break
  
-        self.targetedPosition = int(self.send_get_out("SP", True)[3:])
+        
+
         self.make_log_entry()
         print("Move Finished")
         
+        self.validate_position()
 
     def move_absolute(self, target: float) -> None:
         if not self.angle_in_valid_range(target):
             print("Move would put it out of range! Limits: ({}, {}), Given:{}".format(self.lowerLimit, self.upperLimit, target))
             return
+
+        if (not self.validate_position() or not self.is_motor_on()):
+            print("Move not executed!")
+            return
+
         diff = target - self.targetedAngle
         t_steps = self.angle_to_steps(diff)
         print("Diff in move {:.5f} deg".format(self.get_diff_in_requested_position(t_steps, diff)))
 
         self.targetedAngle += self.steps_to_angle(t_steps) 
+        self.targetedPosition += t_steps
+
         self.send("VE1")
         self.send('FL{}'.format(t_steps))
         esttime = self.steps_to_time(t_steps)
@@ -188,10 +201,10 @@ class StepperControl:
                 time.sleep(esttime)
                 break
 
-        self.targetedPosition = int(self.send_get_out("SP", True)[3:])
         self.make_log_entry()
         print("Move Finished")
 
+        self.validate_position()
 
     def angle_to_steps(self, angle_deg: float) -> int:
         return int((angle_deg / 360) * self.stepsPerRot * self.gear_ratio)
@@ -225,10 +238,10 @@ class StepperControl:
         self.send("AR")
 
     def motor_enable(self, enable=True):
-        if enable:
+        if enable == 1:
             print("Set motor enable true")
             self.send("ME")
-        else:
+        elif enable == 0:
             print("Set motor enable false")
             self.send("MD")
 
@@ -281,6 +294,8 @@ class StepperControl:
         print(f"Limits: [{self.lowerLimit}, {self.upperLimit}]")
 
     def set_limits(self, low: float, high: float) -> None:
+        if abs(low - high) < 1e-6:
+            print("Limits are equal, this removes limits on movement!")
         self.lowerLimit = min(low, high)
         self.upperLimit = max(low, high)
     
@@ -309,6 +324,20 @@ class StepperControl:
         for i in range(0,16):
             if ret[i]=="1":
                 print(true_strings[15-i])
+
+    def validate_position(self) -> bool: 
+        if (self.targetedPosition != int(self.send_get_out("SP", True)[3:])):
+            print("Severe error! Actuator may be in different position than we think!")
+            return False
+        return True
+
+    def is_motor_on(self) -> bool:
+        status = int(self.send_get_out("SC", ret=True)[3:])
+        if status % 2 != 1:
+            print("Motor is not enabled!")
+        return status % 2 == 1
+        
+        
 
     def get_alarm(self):
         ret=self.send_get_out("AL", ret=True)
