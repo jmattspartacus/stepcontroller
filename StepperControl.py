@@ -6,13 +6,14 @@ class StepperControl:
         logger: Logger.Logger,
         stepsPerRot: int = 200, 
         connect_timeout: float = 60, 
-        port: str = "/dev/ttyUSB0",
+        port: str = "/dev/ttyS4",
         gear_ratio: float = 14.0 / 1.0,
         model_code: str ="ff0716"):
         self.logger = logger
         self.stepsPerRot=stepsPerRot
         self.connect_timeout=connect_timeout
         self.gear_ratio=gear_ratio
+        self.targetedAngle=0
         self.targetedPosition=0
         self.lowerLimit = 0
         self.upperLimit = 90
@@ -28,31 +29,15 @@ class StepperControl:
             raise e
         
         
-
-    def try_connect(self):
-        print("connecting")
-        i = 0
-        repeat = self.connect_timeout / 0.1
-        while True:
-            self.send_key()
-            reply = self.get_output(ret=True, delay=0)
-            if reply == self.model_code:
-                break
-            i+=1
-            if i == repeat:
-                raise Exception("Failed to initialize")
-        print("connected")
-        self.motor_setup()
-        self.load_from_log()
-    
-    #def check_alive(self):
-    #    self.send("SSFOO")
-    #    test = self.get_output(ret=True)
-    #    return test == "FOO"
+    def check_connect(self):
+        ret=self.send_get_out("SSFOO", ret=True)
+        if (ret.strip()=="FOO"):
+            return True
+        else:
+            return False
 
     def reinit(self):
         try:
-            self.try_connect()
             self.motor_setup()
         except Exception as e:
             raise e
@@ -71,7 +56,6 @@ class StepperControl:
         ser.rtscts = False
         ser.dsrdtr = False
         ser.writeTimeout = 0
-        #ser.rs485_mode = serial.rs485.RS485Settings(delay_before_rx=0.1, delay_before_tx=1e-3)
         self.ser = ser
 
     # When we send a serial command, the program will check and print
@@ -84,17 +68,29 @@ class StepperControl:
                 print ("Error Communicating...: " + str(e1))
             self.flush_input()
 
-    def send_key(self):
-        if self.ser.isOpen():
-            try:
-                self.ser.write("00".encode())
-            except Exception as e1:
-                print ("Error Communicating...: " + str(e1))
-            self.flush_input()
+    def get_output(self, ret= False ):
+        response = self.ser.read(15)
+        #print(response)
+        try:
+            text = response.decode()
+            if ret:
+                self.flush()
+                return text
+            if len(text) > 0:
+                print (text)
+                self.flush()
+            
+        except:
+            if ret:
+                self.flush()
+                return response.hex()
+            else:
+                self.flush()
+                print(response.hex())
 
-    def send_get_out(self, command):
+    def send_get_out(self, command, ret=False):
         self.send(command)
-        self.get_output(delay=0)
+        return self.get_output(ret=ret)
 
     def motor_setup(self):
             """
@@ -129,12 +125,12 @@ class StepperControl:
 
 
     def move_relative(self, deg: float) -> None:
-        if not self.angle_in_valid_range(deg + self.targetedPosition):
+        if not self.angle_in_valid_range(deg + self.targetedAngle):
             print("Move would put it out of range!")
             return
 
         t_steps = self.angle_to_steps(deg)
-        self.targetedPosition  += self.steps_to_angle(t_steps)
+        self.targetedAngle  += self.steps_to_angle(t_steps)
     
         print("Diff in move {:.5f} deg".format(self.get_diff_in_requested_position(t_steps, deg)))
         # we want the timing predictable
@@ -144,29 +140,57 @@ class StepperControl:
         self.previous_move = t_steps
 
         print("Moving by {:.5f} degrees".format(self.steps_to_angle(t_steps)))
-        time.sleep(esttime)
-        print("Move Finished")
+        while True:
+            ret=self.send_get_out("SC", True)
+            try:
+                ret = int(ret[3:])
+                ret = int(bin(ret).replace("0b", ""))
+                ret = "%016i"%(ret)
+                print("Moving...")
+                if ret[11] == "0":
+                    break
+            except:
+                print("SC unexpected output, default to waiting")
+                time.sleep(esttime)
+                break
+ 
+        self.targetedPosition = int(self.send_get_out("SP", True)[3:])
         self.make_log_entry()
+        print("Move Finished")
         
 
     def move_absolute(self, target: float) -> None:
         if not self.angle_in_valid_range(target):
             print("Move would put it out of range! Limits: ({}, {}), Given:{}".format(self.lowerLimit, self.upperLimit, target))
             return
-        diff = target - self.targetedPosition
+        diff = target - self.targetedAngle
         t_steps = self.angle_to_steps(diff)
         print("Diff in move {:.5f} deg".format(self.get_diff_in_requested_position(t_steps, diff)))
 
-        self.targetedPosition += self.steps_to_angle(t_steps) 
+        self.targetedAngle += self.steps_to_angle(t_steps) 
         self.send("VE1")
         self.send('FL{}'.format(t_steps))
         esttime = self.steps_to_time(t_steps)
         self.previous_move = t_steps
 
-        print("Moving to {:.5f} deg".format(self.targetedPosition))
-        time.sleep(esttime)
-        print("Move Finished")
+        print("Moving to {:.5f} deg".format(self.targetedAngle))
+        while True:
+            ret=self.send_get_out("SC", True)
+            try:
+                ret = int(ret[3:])
+                ret = int(bin(ret).replace("0b", ""))
+                ret = "%016i"%(ret)
+                print("Moving...")
+                if ret[11] == "0":
+                    break
+            except:
+                print("SC unexpected output, default to waiting")
+                time.sleep(esttime)
+                break
+
+        self.targetedPosition = int(self.send_get_out("SP", True)[3:])
         self.make_log_entry()
+        print("Move Finished")
 
 
     def angle_to_steps(self, angle_deg: float) -> int:
@@ -179,26 +203,6 @@ class StepperControl:
         # assumes VE1 has been called
         return abs(1.1 * float(steps) / float(self.stepsPerRot))
 
-    def get_output(self, ret= False, delay : float = 0.1):
-        time.sleep(delay)
-        response = self.ser.read(15)
-        print(response)
-        try:
-            text = response.decode()
-            if ret:
-                self.flush()
-                return text
-            if len(text) > 0:
-                print (text)
-                self.flush()
-            
-        except:
-            if ret:
-                self.flush()
-                return response.hex()
-            else:
-                self.flush()
-                print(response.hex())
 
     def flush(self):
         self.flush_input()
@@ -210,8 +214,12 @@ class StepperControl:
     def flush_output(self):
         self.ser.flushOutput()
 
-    def output_targeted_position(self):
+    def get_angle(self):
+        print(self.targetedAngle)
+
+    def get_position(self):
         print(self.targetedPosition)
+        self.send_get_out("SP")
 
     def clear_alarm(self):
         self.send("AR")
@@ -224,22 +232,14 @@ class StepperControl:
             print("Set motor enable false")
             self.send("MD")
 
-    def make_log_entry(self):
-        self.logger.write("{:.5f}, {}, {:.5f}, {}, {:.5f}, {:.5f}".format(
-            self.targetedPosition, 
-            self.stepsPerRot,
-            self.accumulated_error,
-            self.previous_move, 
-            self.lowerLimit,
-            self.upperLimit
-        ))
-
     def calibrate(self, calibrate_position: float) -> None:
         if not self.angle_in_valid_range(calibrate_position):
             print("Calibration must be inside the limits!")
             return
         print(f"Setting current position to {calibrate_position} degrees")
-        self.targetedPosition = calibrate_position
+        self.targetedAngle = calibrate_position
+        self.targetedPosition = 0
+        self.send("SP0")
 
     def angle_in_valid_range(self, angle: float) -> bool: 
         return (
@@ -250,17 +250,31 @@ class StepperControl:
     def get_diff_in_requested_position(self, steps: int, amt: float) -> float:
         return self.steps_to_angle(steps) - amt
 
+    def make_log_entry(self):
+        self.logger.write("{:.5f}, {}, {}, {:.5f}, {}, {:.5f}, {:.5f}".format(
+            self.targetedAngle, 
+            self.targetedPosition,
+            self.stepsPerRot,
+            self.accumulated_error,
+            self.previous_move, 
+            self.lowerLimit,
+            self.upperLimit
+        ))
+
     def load_from_log(self):
         last = self.logger.get_last()
         if last is not None:
-            date, pos, res, err, prev, low, high = last.split(", ")
-            print(f"Loading position from log, date: {date}, position: {pos} deg, resolution: {res} spr, Limits: [{low}, {high}] deg")
-            self.targetedPosition = float(pos)
+            date, ang, pos, res, err, prev, low, high = last.split(", ")
+            print(f"Loading position from log, date: {date}, position: {pos} steps, angle: {ang} degrees, resolution: {res} spr, Limits: [{low}, {high}] deg")
+            self.targetedAngle = float(ang)
+            self.targetedPosition = int(pos)
             self.set_steps_per_rotation(int(res))
             self.accumulated_error = float(err)
             self.previous_move = int(prev)
-            self.set_limits(low, high)
+            self.set_limits(float(low), float(high))
+            self.send("SP"+str(int(pos)))
         else:
+            self.send("SP0")
             self.set_steps_per_rotation(2000)
 
     def print_limits(self):
@@ -269,3 +283,60 @@ class StepperControl:
     def set_limits(self, low: float, high: float) -> None:
         self.lowerLimit = min(low, high)
         self.upperLimit = max(low, high)
+    
+    def get_status(self):
+        ret=self.send_get_out("SC", ret=True)
+        ret = int(ret[3:])
+        ret = int(bin(ret).replace("0b", ""))
+        ret = "%016i"%(ret)
+        print(ret)
+        true_strings = ["Motor Enabled and in position",
+                        "Sampling",
+                        "Drive Fault (check Alarm Code)",
+                        "In Position, only valid on servo and StepSERVO drives",
+                        "Moving",
+                        "Jogging",
+                        "Stopping",
+                        "Waiting",
+                        "Saving",
+                        "Alarm present (check Alarm Code)",
+                        "Homing",
+                        "Waiting",
+                        "Wizard running",
+                        "Checking encoder",
+                        "Q Program is running",
+                        "Initializing"]
+        for i in range(0,16):
+            if ret[i]=="1":
+                print(true_strings[15-i])
+
+    def get_alarm(self):
+        ret=self.send_get_out("AL", ret=True)
+        ret = int(ret[3:])
+        ret = int(bin(ret).replace("0b", ""))
+        ret = "%016i"%(ret)
+        print(ret)
+        true_strings = ["Position Limit",
+                        "CCW Limit",
+                        "CW Limit",
+                        "Over Temp",
+                        "Internal Voltage",
+                        "Over Voltage",
+                        "Under Voltage",
+                        "Over Current",
+                        "Open Motor Winding",
+                        "Bad Encoder",
+                        "Comm Error",
+                        "Bad Flash",
+                        "No Move",
+                        "",
+                        "Blank Q Segment",
+                        ""]
+
+        if (int(ret) == 0):
+            print("No alarm")
+        else:
+            for i in range(0,16):
+                if ret[i]=="1":
+                    print(true_strings[15-i])
+
