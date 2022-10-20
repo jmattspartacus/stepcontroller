@@ -2,16 +2,15 @@
 
 
 class HelpCommand:
-    def __call__(self, 
+    def __init__(self, 
         name: str,
         func,
-        arg_types: list,
+        arg_types,
         arg_opt: bool,
         is_advanced: bool,
         desc: str,
-        arg_desc: list,
-        example: str
-    ):
+        arg_desc,
+        example: str):
         self.name        = name
         self.func        = func
         self.desc        = desc

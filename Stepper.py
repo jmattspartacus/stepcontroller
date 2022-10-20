@@ -1,4 +1,3 @@
-import serial, time, sys
 from sys import argv
 import WebPower
 import Logger
@@ -50,9 +49,7 @@ if __name__ == "__main__":
         print(port)
 
     commands = [
-        HelpCommand("boot", BootStepper, [str], False, False, "Boots the controller with the supplied port", ["port: the port that the controller is attached to"],"boot /dev/ttyUSB0"),
-        HelpCommand("reboot", PowerCycle, [], False, False, "Reboots the controller, by power cycling the power switch", [], "reboot"),
-
+       
     ]
 
     def helpme(command: str = ""):
@@ -69,8 +66,23 @@ if __name__ == "__main__":
             return
         for i in cmd.keys():
             print("{:<20}:{}".format(i, cmd[i]["desc"]))
+    
+    def helpmeadvanced(command: str = ""):
+
+        for i in cmd:
+            if i.name == command and i.is_advanced:
+                i.printshort(True)
+                return
+        for i in cmd:
+            if i.is_advanced:
+                i.printlong(True)
+        
+        
+        
 
     cmd=[
+        HelpCommand("boot", BootStepper, [str], False, False, "Boots the controller with the supplied port", ["port: the port that the controller is attached to"],"boot /dev/ttyUSB0"),
+        HelpCommand("reboot", PowerCycle, [], False, False, "Reboots the controller, by power cycling the power switch", [], "reboot"),
         HelpCommand("motorenable",control.motor_enable,[int],False,False,"Enables or disables the motor attached to the controller",["Enable/disable (int), enter 1 for enable, 0 for disable"],"motorenable 1"),
         HelpCommand("alarmclear",control.clear_alarm,[],False,False,"Clears any alarms for the controller immediately",[],"alarmclear"),
         HelpCommand("shutdown",power.PowerOff(),[],False,False,"Shutdown the controller by turning off power to the webpower switch and closing the connection to the serial port",[],"shutdown"),
@@ -84,7 +96,10 @@ if __name__ == "__main__":
         HelpCommand("calibrate",control.calibrate,[float],False,True,"Define the position to be the supplied angle. This respects software limits.",["Angle (float), the angle in degrees where the position will be defined to be"],"calibrate 0"),
         HelpCommand("getlim",control.print_limits,[],False,False,"Prints the software limits set for the angle of the output shaft",[],"getlim"),
         HelpCommand("setlim",control.set_limits,[float, float],False,True,"Changes the software limits of the position of the output shaft",["Low (float), the angle in degrees where lower limit of the position will be.","High (float), the angle in degrees where upper limit of the position will be."],"setlim 0.0 90.0"),
-        HelpCommand("helpme",helpme,[str],False,True,"Prints the help text for the specified command. Defaults to all commands.",["Command (str), the command you want information about, defaults to all"],"help cmd")
+        HelpCommand("helpme",helpme,[str],False,True,"Prints the help text for the specified command. Defaults to all commands.",["Command (str), the command you want information about, defaults to all"],"helpme cmd"),
+        HelpCommand("helpme",helpmeadvanced,[str],False,True,"Prints the help text for the specified advanced commands. Defaults to all commands.",["Command (str), the command you want information about, defaults to all"],"helpme cmd")
+
+
         #HelpCommand("setport",SetPort,[str],False,False,"Sets the port used to connect", )
         #"testfunc":   {"func": testfunc, "args":[str, float, int]}
         #"testloadfromlog":   {"func": control.load_from_log, "args":[]},
