@@ -50,7 +50,8 @@ if __name__ == "__main__":
         global port
         port = in_port
         global control
-        control = StepperControl.StepperControl(logger=log, port=port) 
+        control.port = port
+        control.motor_init()
     
     def GetPort():
         print(port)
