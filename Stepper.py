@@ -66,7 +66,6 @@ if __name__ == "__main__":
                 i.print_short(False)
  
     def helpmeadvanced(command: str = ""):
-
         for i in cmd:
             if i.name == command and i.is_advanced:
                 i.print_long(True)
@@ -117,6 +116,8 @@ if __name__ == "__main__":
     def cmd_parse(in_cmd: str):
         spl = in_cmd.split(" ")
         spl = [i for i in spl if len(i) > 0]
+        if len(spl) == 0:
+            return
         if spl[0] == "bootoverride":
             global booted
             booted=True
