@@ -9,7 +9,9 @@ class Logger:
             with open(log_file, "r") as rfp:
                 self.log_history=rfp.readlines()
             self.log_fp = open(log_file, "a+")
-            self.log_history = [i.replace("\n", "") for i in self.log_history]
+            self.log_history = [i.replace("\n", "").replace(" ", "") for i in self.log_history]
+            for i in self.log_history:
+                print(i)
         else:
             print("No history, opening new log")
             self.log_fp = open(log_file, "w+")
