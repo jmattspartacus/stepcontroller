@@ -126,7 +126,8 @@ if __name__ == "__main__":
             global booted
             booted=True
             return
-        if spl[0] != "boot" and not booted and spl[0] != "help":
+        nobootallowed = ["boot", "help", "helpadv", "setport"]
+        if spl[0] not in nobootallowed and not booted:
             print("Please boot!")
             return
         j = -1
