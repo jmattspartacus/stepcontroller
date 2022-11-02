@@ -282,7 +282,7 @@ class StepperControl:
     def load_from_log(self):
         last = self.logger.get_last()
         if last is not None:
-            date, ang, pos, res, err, prev, low, high = last.split(", ")
+            date, ang, pos, res, err, prev, low, high = last.split(",")
             print(f"Loading position from log, date: {date}, position: {pos} steps, angle: {ang} degrees, resolution: {res} spr, Limits: [{low}, {high}] deg")
             self.targetedAngle = float(ang)
             self.targetedPosition = int(pos)
