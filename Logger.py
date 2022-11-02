@@ -15,7 +15,7 @@ class Logger:
             self.log_fp = open(log_file, "w+")
 
     def get_last(self):
-        if len(self.log_history) > 0:
+        if len(self.log_history) > 1:
             return self.log_history[-1]
         else:
             return None
@@ -26,7 +26,12 @@ class Logger:
         self.log_fp.write(entry+"\n")
         self.log_history.append(entry)
         self.log_fp.flush()
-        
+    
+    def write_header(self, entry: str) -> None:
+        # don't append history this is a new log
+        self.log_fp.write(entry + "\n")
+        self.log_fp.flush()
+
     def get(self, idx: int) -> str:
         if idx < len(self.log_history):
             return self.log_history[idx]
