@@ -21,24 +21,23 @@ class StepperControl:
         self.model_code=model_code
         self.accumulated_error = 0
         self.previous_move     = 0
-        try:
-            self.motor_init()
-            self.ser.open()
-        except Exception as e:
-            print(e)
-            raise e
+        self.motor_init()
+        
         
         
     def check_connect(self):
-        ret=self.send_get_out("SSFOO", ret=True)
-        if (ret.strip()=="FOO"):
-            return True
-        else:
-            return False
+        try:
+            ret=self.send_get_out("SSFOO", ret=True)
+            if (ret.strip()=="FOO"):
+                return True
+            else:
+                return False
+        except:
+            print(f"Serial connection is not open, check that your port is valid!")
 
     # Initialization parameters. Note the serial port and baud rate of your project
     # may vary. Our default baud rate is 9600
-    def motor_init(self):
+    def motor_init(self) -> None:
         ser=serial.Serial()
         ser.port = self.port
         ser.baudrate = 9600
@@ -51,10 +50,15 @@ class StepperControl:
         ser.dsrdtr = False
         ser.writeTimeout = 0
         self.ser = ser
+        try:
+            self.ser.open()
+        except Exception as e:
+            print(f"Failed to initialize serial connection, check that the port '{self.port}' exists and is valid")
+            
 
     # When we send a serial command, the program will check and print
     # the response given by the drive.
-    def send(self, command):
+    def send(self, command) -> None:
         if self.ser.isOpen():
             try:
                 self.ser.write((command+'\r').encode())
@@ -111,7 +115,7 @@ class StepperControl:
 
     def get_closest_value_in_steps_range(self, val: int) -> int:
         table=[
-            200, 400, 2000, 5000, 10000, 12800, 18000, 20000,
+            200, 400, 1000, 2000, 5000, 10000, 12800, 18000, 20000,
             21600, 25000, 25400, 36000, 50000, 50800
         ]
         t_ret = 0
@@ -119,6 +123,7 @@ class StepperControl:
         for i in range(len(table)):
             if abs(table[i] - val) < diff:
                 t_ret = i
+        t_ret = 3 if t_ret == 2 else t_ret
         return t_ret, table[t_ret]
 
 
