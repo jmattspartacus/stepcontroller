@@ -52,6 +52,7 @@ class StepperControl:
         self.ser = ser
         try:
             self.ser.open()
+            self.make_log_entry()
         except Exception as e:
             print(f"Failed to initialize serial connection, check that the port '{self.port}' exists and is valid")
             
