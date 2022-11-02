@@ -1,4 +1,4 @@
-import serial, time, serial.rs485
+import serial, time
 import Logger
 
 class StepperControl:
@@ -269,21 +269,22 @@ class StepperControl:
         return self.steps_to_angle(steps) - amt
 
     def make_log_entry(self):
-        self.logger.write("{:.5f}, {}, {}, {:.5f}, {}, {:.5f}, {:.5f}".format(
+        self.logger.write("{:.5f}, {}, {}, {:.5f}, {}, {:.5f}, {:.5f}, {}".format(
             self.targetedAngle, 
             self.targetedPosition,
             self.stepsPerRot,
             self.accumulated_error,
             self.previous_move, 
             self.lowerLimit,
-            self.upperLimit
+            self.upperLimit,
+            self.port
         ))
 
     def load_from_log(self):
         last = self.logger.get_last()
         if last is not None:
-            date, ang, pos, res, err, prev, low, high = last.split(",")
-            print(f"Loading position from log, date: {date}, position: {pos} steps, angle: {ang} degrees, resolution: {res} spr, Limits: [{low}, {high}] deg")
+            date, ang, pos, res, err, prev, low, high, port = last.split(",")
+            print(f"Loading position from log, date: {date}, position: {pos} steps, angle: {ang} degrees, resolution: {res} spr, Limits: [{low}, {high}] deg, port{port}")
             self.targetedAngle = float(ang)
             self.targetedPosition = int(pos)
             self.set_steps_per_rotation(int(res))
@@ -343,7 +344,7 @@ class StepperControl:
         return status % 2 == 1
         
     def print_log_headers(self) -> None:
-        self.logger.write_header("date, angle(deg), pos(steps), res(spr), err(deg), prev(step), low(deg), high(deg")
+        self.logger.write_header("date, angle(deg), pos(steps), res(spr), err(deg), prev(step), low(deg), high(deg, port")
 
     def get_alarm(self):
         ret=self.send_get_out("AL", ret=True)
