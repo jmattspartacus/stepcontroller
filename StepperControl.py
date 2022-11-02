@@ -342,7 +342,8 @@ class StepperControl:
             print("Motor is not enabled!")
         return status % 2 == 1
         
-        
+    def print_log_headers(self) -> None:
+        self.logger.write_header("date, angle(deg), pos(steps), res(spr), err(deg), prev(step), low(deg), high(deg")
 
     def get_alarm(self):
         ret=self.send_get_out("AL", ret=True)

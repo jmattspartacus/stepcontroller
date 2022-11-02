@@ -31,7 +31,10 @@ if __name__ == "__main__":
     log     = Logger.Logger("stepper.log")
     power   = WebPower.WebPower(log, 24)
     power.CheckStatus()
-    control = StepperControl.StepperControl(logger=log, port=port) 
+    control = StepperControl.StepperControl(logger=log, port=port)
+    # keep the log from knowing anything about the impl of control 
+    if len(log.log_history) == 0:
+        control.print_log_headers()
     booted  = control.check_connect() 
     GetBooted()
     if booted:
