@@ -29,9 +29,9 @@ class HelpCommand:
         if self.is_advanced and not advanced:
             return
         print("{:<20}:{}".format(self.name, self.desc))
-        if len(self.args_desc) > 0:
+        if len(self.arg_desc) > 0:
             print("Arguments:")
-            for j in self.args_desc:
+            for j in self.arg_desc:
                 print("    ", j)
         print("Example:", self.example)
     
