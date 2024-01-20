@@ -4,3 +4,5 @@ StepRS/target/**
 **/.DS_Store
 stepper.log
 *config*.csv
+*.lock
+*.log
