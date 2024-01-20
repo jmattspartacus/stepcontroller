@@ -23,7 +23,55 @@ class StepperControl:
         self.previous_move     = 0
         self.motor_init()
         
-        
+    def first_boot(self, webpower):
+        # power cycle to make sure the motor is ready to configure
+        print("Powering off webpower switch")
+        if not webpower.PowerOff():
+            print("PowerOff failed!")
+            return
+        print("Sleeping for 1 second")
+        time.sleep(1)
+        if not webpower.PowerOn():
+            print("PowerOff failed!")
+            return
+        print("Powering on switch")
+        # command must be received at least 2 milliseconds after power is on
+        # but not more than 2 seconds, so we wait just long enough
+        time.sleep(0.05)
+        # enable SCL mode
+        self.send("00")
+        try:
+            ret=self.send_get_out("SSFOO", ret=True)
+            if ("FOO" not in ret.strip()):
+                print("Motor did not acknowledge being booted in scl mode!")
+                return
+        except serial.SerialTimeoutException as e:
+            print(f"Attempting to get FOO reply from motor threw exception:\n{e}")
+            return
+        except serial.SerialException as e:
+            print(f"Threw an exception in PySerial:\n{e}")
+            return
+        except Exception as e:
+            print(f"Unhandled exception!\n{e}")
+            return
+
+        # enable Power Mode 2 to ensure that the motor doesn't auto detect connections
+        # as this causes an unclearable alarm state
+        self.send("PM2")
+        # removes the hardware drive motion limits, from the factory, the lower and
+        # upper values are set to the same thing, and so it causes an alarm when trying to
+        # move for the first time
+        self.send("DL3")
+        # Configure the protocol to make sure that we're not getting ack/nack, etc back
+        # when trying to check for boot
+        self.send("PR1")
+        # Save all parameters for the next time we turn on the motor
+        self.send("SA")
+        if not self.check_connect():
+            print("Failed to do first boot, please check that\n\tThe controller is powered\n\tThe serial port is correct\n\tThe webpower switch port is correct\n\tThe webpower switch is turned on\n\tThe webpower switch script is configured correctly!")
+            return False
+        return True
+
         
     def check_connect(self):
         try:
