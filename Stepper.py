@@ -91,7 +91,7 @@ if __name__ == "__main__":
         ("profile", "nobody", str, None, ""), 
         ("port", "/dev/null", str, lambda a: os.path.exists(a), "port not found"), 
         ("webpower_port", "-1", int, lambda a: a >= 0 and a < 40, "value out of range"),
-        ("log_name", "nobody.log", str, lambda a: os.path.exists(a), "log not found")
+        ("log_name", "nobody.log", str, None, "")
     ]
     profiles = load_config(config_file_name, default_profile_values)
     profile_name = "nobody"
@@ -118,10 +118,26 @@ if __name__ == "__main__":
     webpower_port = profile["webpower_port"]
     
     Splash()
+    first_boot = False
+    # Assume that this is the first boot if the log is empty
+    try:
+        with open(log_name) as fptr:
+            # this is a new log
+            if "".join(fptr.readlines()) == "":
+                first_boot = True
+    except FileNotFoundError:
+        first_boot = True
+
+    exit()
     log     = Logger.Logger(log_name)
     power   = WebPower.WebPower(log, webpower_port)
     power.CheckStatus()
     control = StepperControl.StepperControl(logger=log, port=port)
+
+    if first_boot:
+        print("Attempting first boot!")
+        control.first_boot(power)
+
     # keep the log from knowing anything about the impl of control 
     if len(log.log_history) == 0:
         control.print_log_headers()
@@ -251,8 +267,7 @@ if __name__ == "__main__":
             t_cmd.func()
 
 
-
-    endvals = ["quit", "exit", "stop", "end"]
+    endvals = ["quit", "exit", "stop", "end", ".q"]
     while True:
         inval = input("-> ")
         if inval in endvals:
@@ -261,6 +276,4 @@ if __name__ == "__main__":
 
     if booted:
         control.ser.close()
-
-
-
+        power.PowerOff()
