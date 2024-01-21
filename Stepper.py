@@ -4,8 +4,68 @@ import WebPower
 import Logger
 import StepperControl
 from HelpCommand import HelpCommand
+import os
 #Gear ratio 14:1
 
+
+def load_config(config_file_name, default_profile_values):
+    """
+    Loads a config for the stepper motor controller from disk,
+    creating a default nonfunctional one if it does not exist. 
+    Returns profiles for each motor that exists in the config.
+    """
+    profiles = {}
+    # verify config exists and create default if not found
+    if not os.path.exists(config_file_name):
+        print(f"No config file detected! Generating a default config at ./{config_file_name}! This must be edited for your environment before continuing!")
+        with open(config_file_name, "w+") as fp:
+            header = ", ".join([i[0] for i in default_profile_values]) + "\n"
+            values = ", ".join([i[1] for i in default_profile_values]) + "\n"
+            fp.writelines([
+                header, values
+            ])
+        exit(1)
+    config_header = []
+    # load config into files
+    with open(config_file_name, "r") as fp:
+        l = fp.readlines()
+        # get the name of the fields we want each profile to have
+        config_header = [ i.strip() for i in l[0].replace(" ", "").split(",") ][1:]
+        # get the names of the profiles
+        for i in range(1, len(l)):
+            pname = l[i].split(",")[0]
+            profiles[pname] = {}
+        # now we populate the fields of the profiles
+        for i in range(1, len(l)):
+            spl = [k.strip() for k in l[i].split(",")]
+            for j in range(1, len(spl)):
+                profiles[spl[0]][config_header[j - 1]] = default_profile_values[j][2](spl[j])
+    return profiles
+
+
+def validate_profile(profile, default_profile_values):
+    for i in range(1, len(default_profile_values)):
+        prop            = default_profile_values[i][0]
+        val             = default_profile_values[i][1]
+        # function/lambda that converts the value to it's correct 
+        # type
+        typefunc        = default_profile_values[i][2]
+        validation_func = default_profile_values[i][3]
+        fail_message    = default_profile_values[i][4]
+        try:
+            val  = typefunc(val)
+        except:
+            print(f"Failed to parse default value property {prop} to it's correct type!")
+            exit(1)
+        # check for default value
+        if profile[prop] == val:
+            print(f"Profile {profile_name} has property {prop} with value {val}, the same as default!")
+            exit(1)
+
+        # check that the input is in a correct range
+        if validation_func and not validation_func(profile[prop]):
+            print(f"Profile {profile_name} has an invalid value for {prop}! {fail_message}")
+            exit(1)
 
 if __name__ == "__main__":
 
@@ -15,7 +75,7 @@ if __name__ == "__main__":
         print("===============================================================")
         print("Control software for stepper motor actuator control            ")
         print("Contact Tim Gray         graytj@ornl.gov                       ")
-        print("Contact James Christie   jchris44@vols.utk.edu                 ")
+        print("Contact James Christie   jmchristie321@gmail.com               ")
         print("type \"help\" for commands                                     ")
         print("port is {}".format(port))
     
@@ -25,11 +85,41 @@ if __name__ == "__main__":
         else:
             print("Controller is not booted")
 
-    port = "/dev/ttyS4" 
-    Splash()
+    config_file_name = "stepper_config.csv"
+    default_profile_values = [
+        # property name, default value, type, validation lambda, failure message
+        ("profile", "nobody", str, None, ""), 
+        ("port", "/dev/null", str, lambda a: os.path.exists(a), "port not found"), 
+        ("webpower_port", "-1", int, lambda a: a >= 0 and a < 40, "value out of range"),
+        ("log_name", "nobody.log", str, lambda a: os.path.exists(a), "log not found")
+    ]
+    profiles = load_config(config_file_name, default_profile_values)
+    profile_name = "nobody"
 
-    log     = Logger.Logger("stepper.log")
-    power   = WebPower.WebPower(log, 24)
+    # use the specified profile!
+    if len(argv) == 2 and argv[1] in profiles:
+        profile_name = argv[1]
+    # use the first profile found
+    else:
+        profile_name = list(profiles.keys())[0]
+        print(f"Profile name not found or not provided, using profile {profile_name}!")
+
+    # check for the default profile name, because this must not be used
+    if profile_name == "nobody":
+        print("Profile name cannot be 'nobody' name is reserved!")
+        exit(1)
+    
+    profile = profiles[profile_name]
+    validate_profile(profile, default_profile_values)
+
+    # take the data out of the profile to make easier to work with
+    port          = profile["port"]
+    log_name      = profile["log_name"]
+    webpower_port = profile["webpower_port"]
+    
+    Splash()
+    log     = Logger.Logger(log_name)
+    power   = WebPower.WebPower(log, webpower_port)
     power.CheckStatus()
     control = StepperControl.StepperControl(logger=log, port=port)
     # keep the log from knowing anything about the impl of control 
