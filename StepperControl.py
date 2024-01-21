@@ -65,6 +65,12 @@ class StepperControl:
         # Configure the protocol to make sure that we're not getting ack/nack, etc back
         # when trying to check for boot
         self.send("PR1")
+        # set to point to point command mode
+        self.send("CM21")
+        # set acceleration rate to 10 rev/sec/sec
+        self.send("AC10")
+        # set deceleration rate to 10 rev/sec/sec
+        self.send("DE10")
         # Save all parameters for the next time we turn on the motor
         self.send("SA")
         # set the position that the motor thinks it's at to zero because otherwise we 
