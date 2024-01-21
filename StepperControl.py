@@ -67,6 +67,9 @@ class StepperControl:
         self.send("PR1")
         # Save all parameters for the next time we turn on the motor
         self.send("SA")
+        # set the position that the motor thinks it's at to zero because otherwise we 
+        # will trigger errors in the script with movement
+        self.send("SP0")
         if not self.check_connect():
             print("Failed to do first boot, please check that\n\tThe controller is powered\n\tThe serial port is correct\n\tThe webpower switch port is correct\n\tThe webpower switch is turned on\n\tThe webpower switch script is configured correctly!")
             return False
