@@ -10,8 +10,9 @@ class Logger:
                 self.log_history=rfp.readlines()
             self.log_fp = open(log_file, "a+")
             self.log_history = [i.replace("\n", "").replace(" ", "") for i in self.log_history]
-            for i in self.log_history:
-                print(i)
+            loglen = len(self.log_history)
+            for i in range(max(loglen - 10, 0), loglen):
+                print(self.log_history[i])
         else:
             print("No history, opening new log")
             self.log_fp = open(log_file, "w+")
