@@ -76,9 +76,13 @@ if __name__ == "__main__":
         print("Control software for stepper motor actuator control            ")
         print("Contact Tim Gray         graytj@ornl.gov                       ")
         print("Contact James Christie   jmchristie321@gmail.com               ")
+        print("Using profile:           {}".format(profile_name))
+        print("Connecting on:           {}".format(port))
+        print("Using WebPower port:     {}".format(webpower_port))
         print("type \"help\" for commands                                     ")
-        print("port is {}".format(port))
-    
+        print("===============================================================")
+
+
     def GetBooted():
         if booted:
             print ("Controller is booted")
@@ -128,7 +132,6 @@ if __name__ == "__main__":
     except FileNotFoundError:
         first_boot = True
 
-    exit()
     log     = Logger.Logger(log_name)
     power   = WebPower.WebPower(log, webpower_port)
     power.CheckStatus()
